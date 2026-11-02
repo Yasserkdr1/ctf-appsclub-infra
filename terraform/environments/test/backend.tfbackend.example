@@ -1,0 +1,8 @@
+# Copy to backend.tfbackend; this sample has no secrets.
+# Storage account name is printed by scripts/bootstrap-tfstate.sh.
+resource_group_name  = "rg-ctf-tfstate"
+storage_account_name = "REPLACE_WITH_STORAGE_ACCOUNT_NAME"
+container_name       = "tfstate"
+key                  = "ctf-appsclub/test.tfstate"
+use_cli              = true
+use_azuread_auth     = true
