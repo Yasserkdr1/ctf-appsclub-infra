@@ -1,0 +1,61 @@
+---
+- name: Install K3s on Worker
+  hosts: worker
+  become: true
+
+  tasks:
+    - name: Create K3s configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Configure K3s
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          node-ip: 10.60.2.10
+          advertise-address: 10.60.2.10
+          tls-san:
+            - 10.60.2.10
+          secrets-encryption: true
+          write-kubeconfig-mode: "0600"
+          disable:
+            - traefik
+            - servicelb
+
+    - name: Download official K3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /usr/local/src/install-k3s.sh
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Install pinned K3s version
+      ansible.builtin.command:
+        cmd: /bin/sh /usr/local/src/install-k3s.sh
+        creates: /usr/local/bin/k3s
+      environment:
+        INSTALL_K3S_VERSION: "v1.37.1+k3s1"
+        INSTALL_K3S_EXEC: "server"
+
+    - name: Ensure K3s starts automatically
+      ansible.builtin.systemd_service:
+        name: k3s
+        state: started
+        enabled: true
+
+    - name: Wait for Kubernetes node
+      ansible.builtin.command:
+        cmd: k3s kubectl get nodes
+      register: k3s_nodes
+      changed_when: false
+      until: k3s_nodes.rc == 0
+      retries: 18
+      delay: 10
