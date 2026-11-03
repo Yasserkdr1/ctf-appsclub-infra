@@ -1,0 +1,20 @@
+[Interface]
+Address = {{ wg_server_address }}
+ListenPort = {{ wg_port }}
+PrivateKey = {{ wg_server_secret.content | b64decode | trim }}
+SaveConfig = false
+
+# Interdire tout transit VPN vers le réseau Azure
+PostUp = iptables -I FORWARD 1 -i %i -j DROP
+PostDown = iptables -D FORWARD -i %i -j DROP
+
+# Autoriser uniquement le ping vers la gateway VPN
+PostUp = iptables -I INPUT 1 -i %i -j DROP
+PostUp = iptables -I INPUT 1 -i %i -p icmp --icmp-type echo-request -j ACCEPT
+PostDown = iptables -D INPUT -i %i -p icmp --icmp-type echo-request -j ACCEPT
+PostDown = iptables -D INPUT -i %i -j DROP
+
+[Peer]
+# Client de test
+PublicKey = {{ wg_client_public.stdout }}
+AllowedIPs = {{ wg_client_address }}

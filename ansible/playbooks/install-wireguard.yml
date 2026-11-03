@@ -1,0 +1,139 @@
+---
+- name: Install and configure WireGuard VPN
+  hosts: ctfd
+  become: true
+  gather_facts: true
+
+  vars:
+    wg_port: 51820
+    wg_server_address: "10.77.0.1/24"
+    wg_client_address: "10.77.0.10/32"
+    wg_public_endpoint: "158.158.123.197"
+    wg_client_name: "team-test"
+
+  tasks:
+    - name: Install WireGuard and firewall utilities
+      ansible.builtin.apt:
+        name:
+          - wireguard-tools
+          - iptables
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create WireGuard private directory
+      ansible.builtin.file:
+        path: /etc/wireguard/clients
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Generate server private key if absent
+      ansible.builtin.shell: |
+        umask 077
+        wg genkey > /etc/wireguard/server.key
+      args:
+        creates: /etc/wireguard/server.key
+      no_log: true
+
+    - name: Generate test client private key if absent
+      ansible.builtin.shell: |
+        umask 077
+        wg genkey > /etc/wireguard/clients/team-test.key
+      args:
+        creates: /etc/wireguard/clients/team-test.key
+      no_log: true
+
+    - name: Read server private key securely
+      ansible.builtin.slurp:
+        src: /etc/wireguard/server.key
+      register: wg_server_secret
+      no_log: true
+
+    - name: Read test client private key securely
+      ansible.builtin.slurp:
+        src: /etc/wireguard/clients/team-test.key
+      register: wg_client_secret
+      no_log: true
+
+    - name: Calculate server public key
+      ansible.builtin.command:
+        cmd: wg pubkey
+        stdin: "{{ wg_server_secret.content | b64decode }}"
+      register: wg_server_public
+      changed_when: false
+      no_log: true
+
+    - name: Calculate test client public key
+      ansible.builtin.command:
+        cmd: wg pubkey
+        stdin: "{{ wg_client_secret.content | b64decode }}"
+      register: wg_client_public
+      changed_when: false
+      no_log: true
+
+    - name: Deploy WireGuard server configuration
+      ansible.builtin.template:
+        src: ../templates/wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart WireGuard
+      no_log: true
+
+    - name: Generate test client configuration
+      ansible.builtin.template:
+        src: ../templates/wg-client.conf.j2
+        dest: /etc/wireguard/clients/team-test.conf
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Create local private directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../secrets/wireguard"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Retrieve client configuration to WSL
+      ansible.builtin.fetch:
+        src: /etc/wireguard/clients/team-test.conf
+        dest: "{{ playbook_dir }}/../secrets/wireguard/team-test.conf"
+        flat: true
+      no_log: true
+
+    - name: Secure local client configuration
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../secrets/wireguard/team-test.conf"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Enable and start WireGuard
+      ansible.builtin.systemd_service:
+        name: wg-quick@wg0
+        enabled: true
+        state: started
+
+    - name: Apply configuration changes
+      ansible.builtin.meta: flush_handlers
+
+    - name: Check WireGuard interface
+      ansible.builtin.command: wg show wg0
+      register: wg_status
+      changed_when: false
+
+    - name: Display WireGuard status
+      ansible.builtin.debug:
+        var: wg_status.stdout_lines
+
+  handlers:
+    - name: Restart WireGuard
+      ansible.builtin.systemd_service:
+        name: wg-quick@wg0
+        state: restarted

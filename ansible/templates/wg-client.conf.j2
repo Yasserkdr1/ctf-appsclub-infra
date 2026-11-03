@@ -1,0 +1,9 @@
+[Interface]
+PrivateKey = {{ wg_client_secret.content | b64decode | trim }}
+Address = {{ wg_client_address }}
+
+[Peer]
+PublicKey = {{ wg_server_public.stdout }}
+Endpoint = {{ wg_public_endpoint }}:{{ wg_port }}
+AllowedIPs = 10.77.0.1/32
+PersistentKeepalive = 25
