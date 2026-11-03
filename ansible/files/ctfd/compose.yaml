@@ -1,0 +1,62 @@
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ctfd
+      MARIADB_USER: ctfd
+      MARIADB_PASSWORD: ${CTFD_DB_PASSWORD:?missing}
+      MARIADB_ROOT_PASSWORD: ${CTFD_DB_ROOT_PASSWORD:?missing}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cache:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    networks:
+      - backend
+
+  ctfd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ctfd-appsclub:3.8.9-cm0.10.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    environment:
+      SECRET_KEY: ${CTFD_SECRET_KEY:?missing}
+      DATABASE_URL: mysql+pymysql://ctfd:${CTFD_DB_PASSWORD:?missing}@db/ctfd
+      REDIS_URL: redis://cache:6379
+      UPLOAD_FOLDER: /var/uploads
+      LOG_FOLDER: /var/log/CTFd
+      WORKERS: "2"
+      PLUGIN_SETTINGS_CM_API_URL: "http://10.60.2.10:31080"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ctfd_uploads:/var/uploads
+      - ctfd_logs:/var/log/CTFd
+    networks:
+      - backend
+      - app
+
+networks:
+  backend:
+    internal: true
+  app:
+
+volumes:
+  db_data:
+  ctfd_uploads:
+  ctfd_logs:

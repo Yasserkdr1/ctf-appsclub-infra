@@ -1,0 +1,5 @@
+**
+!Dockerfile
+!plugins/
+!plugins/ctfd_chall_manager/
+!plugins/ctfd_chall_manager/**
