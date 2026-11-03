@@ -19,3 +19,12 @@ crash.*.log
 .DS_Store
 .vscode/
 # Keep .terraform.lock.hcl tracked.
+/ansible/secrets/ctfd.env
+
+/ansible/secrets/
+
+# Local backup files
+*.bak-*
+
+# Windows downloaded-file metadata
+*:Zone.Identifier
