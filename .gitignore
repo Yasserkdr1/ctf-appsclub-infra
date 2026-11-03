@@ -28,3 +28,6 @@ crash.*.log
 
 # Windows downloaded-file metadata
 *:Zone.Identifier
+
+# Local Ansible inventory
+/ansible/inventory.ini
