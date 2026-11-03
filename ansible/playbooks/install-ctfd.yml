@@ -1,0 +1,68 @@
+---
+- name: Install CTFd stack
+  hosts: ctfd
+  become: true
+
+  tasks:
+    - name: Create CTFd directory
+      ansible.builtin.file:
+        path: /opt/ctf-appsclub/ctfd
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Copy CTFd secrets from WSL to Azure
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../secrets/ctfd.env"
+        dest: /opt/ctf-appsclub/ctfd/.env
+        owner: root
+        group: root
+        mode: "0600"
+        force: false
+      no_log: true
+
+    - name: Copy Docker Compose configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/ctfd/compose.yaml"
+        dest: /opt/ctf-appsclub/ctfd/compose.yaml
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy custom CTFd Dockerfile
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/ctfd/Dockerfile"
+        dest: /opt/ctf-appsclub/ctfd/Dockerfile
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy Chall-Manager plugin
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/ctfd/plugins/"
+        dest: /opt/ctf-appsclub/ctfd/plugins/
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+
+    - name: Copy Docker build exclusions
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/ctfd/.dockerignore"
+        dest: /opt/ctf-appsclub/ctfd/.dockerignore
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Validate Docker Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --quiet
+        chdir: /opt/ctf-appsclub/ctfd
+      changed_when: false
+      no_log: true
+
+    - name: Start CTFd, MariaDB and Redis
+      ansible.builtin.command:
+        cmd: docker compose up -d --build
+        chdir: /opt/ctf-appsclub/ctfd
