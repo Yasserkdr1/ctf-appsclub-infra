@@ -30,6 +30,10 @@ func main() {
 			sdk.WithSpecial(true),
 		))
 
+		if err := req.Ctx.RegisterStackTransformation(hardenDeployment); err != nil {
+			return err
+		}
+
 		challenge, err := k8s.NewExposedMonopod(
 			req.Ctx,
 			"vibechain",
@@ -54,8 +58,14 @@ func main() {
 						"FLAG": k8s.ToPrinter(flag),
 					},
 
-					LimitCPU:    pulumi.StringPtr("500m"),
-					LimitMemory: pulumi.StringPtr("256Mi"),
+					Requests: pulumi.StringMap{
+						"cpu":    pulumi.String("50m"),
+						"memory": pulumi.String("64Mi"),
+					},
+					Limits: pulumi.StringMap{
+						"cpu":    pulumi.String("500m"),
+						"memory": pulumi.String("256Mi"),
+					},
 				},
 			},
 			opts...,
