@@ -1,0 +1,111 @@
+name: CI - Redis lock
+
+on: 
+  push:
+    paths-ignore:
+      - 'webdocs/**'
+      - 'res/**'
+  pull_request:
+
+permissions:
+  contents: read    
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      NAME: ctfer
+      PASSWORD: ctfer
+
+    services:
+      chall-manager: 
+        image: ctferio/chall-manager:v0.6.5@sha256:f30d8d4c0b2fee99ffd8b29b1821d014c0c2ef1b134f87f16ade4e21b3f72f16
+        ports:
+          - 8080:8080
+        env:
+          OCI_INSECURE: true
+
+      redis-svc:
+        image: redis:7.0.10@sha256:92b8b307ee28ed74da17578064c73307ad41e43f422f0b7e4e91498b406c59e3
+        ports: 
+          - 6379:6379
+
+      registry:
+        image: registry:3
+        ports:
+          - 5000:5000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Get GitHub Actions network name
+        id: get_network
+        run: |
+          # Find the network ID (GitHub Actions creates one automatically)
+          NETWORK_NAME=$(docker network ls --filter name=github_network_* --format "{{.Name}}")
+          echo $NETWORK_NAME
+          echo "network_name=$NETWORK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Start CTFd after checkout
+        run: |
+          docker run -d -p 8000:8000 \
+            --name ctfd \
+            --network ${{ steps.get_network.outputs.network_name }} \
+            -e LOG_LEVEL=DEBUG \
+            -e PLUGIN_SETTINGS_CM_API_URL=http://chall-manager:8080 \
+            -e PLUGIN_SETTINGS_CM_MANA_TOTAL=10 \
+            -e REDIS_URL=redis://redis-svc:6379 \
+            -e WORKERS=2 \
+            -e SECRET_KEY=ctfer \
+            -v ${{ github.workspace }}:/opt/CTFd/CTFd/plugins/ctfd_chall_manager \
+            ctfd/ctfd:3.8.5@sha256:476211f53cc3e675cce72bcb495484d890da0a6d48d5de919577912c6da8d4ff
+
+      - name: Setup basic testing env
+        uses: ./.github/workflows/setup-testing
+        with: 
+          ctfd_mode: teams
+          ctfd_user: ${{ env.NAME }}
+          ctfd_pass: ${{ env.PASSWORD }}
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+
+      - name: Run Functional Tests in mode Teams
+        run: |- 
+          python -m unittest test/test_api_challenges.py
+          python -m unittest test/test_api_admin_instance.py
+          python -m unittest test/test_api_admin_import.py
+          python -m unittest test/test_api_instance.py
+          python -m unittest test/test_api_mana.py
+        env:
+          CTFD_URL: http://localhost:8000
+        
+      - name: Update CTFd into mode users
+        uses: ctfer-io/ctfd-setup@b0dc7dde2d126b98441bc70848c1d62a9b30b648 # v1.8.6
+        with:
+          url: 'http://ctfd:8000'
+          appearance_name: CTFer.io
+          appearance_description: CTFer.io plugin tests
+          mode: users 
+          admin_name: ${{ env.NAME }}
+          admin_email: ctfer-io@protonmail.com
+          admin_password: ${{ env.PASSWORD }}
+          accounts_incorrect_submissions_per_minute: 9999
+
+      - name: Run Functional Tests in mode Users
+        run: |- 
+          python -m unittest test/test_api_challenges.py
+          python -m unittest test/test_api_admin_instance.py
+          python -m unittest test/test_api_admin_import.py
+          python -m unittest test/test_api_instance.py
+          python -m unittest test/test_api_mana.py
+        env:
+          CTFD_URL: http://localhost:8000
+
+      - name: Export Logs and clean CTFd
+        if: always()
+        run : |
+          docker logs ctfd
+          docker stop ctfd
+          docker rm ctfd
