@@ -13,7 +13,7 @@ const (
 	workerIP = "10.60.2.10"
 
 	// Image à publier dans un registre avant déploiement
-	challengeImage = "ghcr.io/REPLACE_OWNER/ctf-vibechain:v0.1.0"
+	challengeImage = "ghcr.io/yasserkdr1/ctf-vibechain:v0.1.0"
 )
 
 func main() {
