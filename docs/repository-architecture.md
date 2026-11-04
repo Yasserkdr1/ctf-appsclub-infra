@@ -36,7 +36,7 @@ _Last reviewed from the WSL file tree supplied 2026-11-04. This is an inventory,
 
 The target namespace currently has Pulumi-generated `deny-all-*` and `dns-*` policies. Some files in `ansible/files/k3s/` appear to predate the Pulumi deployment. Do not assume they are obsolete by filename alone.
 
-- `chall-manager-rbac.yaml`, `chall-manager-serviceaccount.yaml`: compare to Pulumi-generated ServiceAccount/Role/RoleBinding and `install-k3s.yml`; do not apply over Pulumi-controlled objects.
+- The legacy Chall-Manager ServiceAccount and RBAC manifests have been removed. Static `ctf-system` resources are defined in `ctf-system-baseline.yaml` and deployed through `bootstrap-ctf-system.yml`; Pulumi owns the active Chall-Manager Deployment and generated ServiceAccount.
 - `ctf-system-*.yaml`: inspect whether bootstrapping or Pulumi deploy still uses them.
 - `ctf-test-*.yaml`: names suggest historical namespace/config. The actual challenge target is `cm-target-daunsoix`. Legacy ctf-test manifests were removed after verifying no active code references.
 - `netcheck.yaml`, `network-probe.yaml`: likely network diagnostics; move to `examples/diagnostics/` or remove only after inspecting contents and references.
