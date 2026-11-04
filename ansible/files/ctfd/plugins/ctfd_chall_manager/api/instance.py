@@ -93,7 +93,11 @@ class UserInstance(Resource):
         data = {}
         for k in ["connectionInfo", "until", "since"]:
             if k in result.keys():
-                data[k] = result[k]
+                if k == "connectionInfo" and is_teams_mode():
+                    from CTFd.plugins.ctfd_chall_manager.utils.appsclub_connection_info import player_vip
+                    data[k] = player_vip(challenge_id, source_id, result[k])
+                else:
+                    data[k] = result[k]
 
         return {"success": True, "data": data}, 200
 
@@ -165,7 +169,11 @@ class UserInstance(Resource):
         data = {}
         for k in ["connectionInfo", "until", "since"]:
             if k in result.keys():
-                data[k] = result[k]
+                if k == "connectionInfo" and is_teams_mode():
+                    from CTFd.plugins.ctfd_chall_manager.utils.appsclub_connection_info import player_vip
+                    data[k] = player_vip(challenge_id, source_id, result[k])
+                else:
+                    data[k] = result[k]
 
         return {"success": True, "data": data}, 200
 

@@ -41,10 +41,13 @@ services:
       UPLOAD_FOLDER: /var/uploads
       LOG_FOLDER: /var/log/CTFd
       WORKERS: "2"
+      REVERSE_PROXY: "True"
       PLUGIN_SETTINGS_CM_API_URL: "http://10.60.2.10:31080"
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
+      - /run/appsclub-vpn:/run/appsclub-vpn:rw
+      - /etc/appsclub-vpn/broker.token:/run/secrets/appsclub-vpn-token:ro
       - ctfd_uploads:/var/uploads
       - ctfd_logs:/var/log/CTFd
     networks:

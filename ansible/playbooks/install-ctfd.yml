@@ -47,6 +47,15 @@
         mode: preserve
         directory_mode: "0755"
 
+    - name: Copy AppsClub VPN plugin into Docker build context
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/ctfd/appsclub_vpn/"
+        dest: /opt/ctf-appsclub/ctfd/appsclub_vpn/
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+
     - name: Copy Docker build exclusions
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../files/ctfd/.dockerignore"

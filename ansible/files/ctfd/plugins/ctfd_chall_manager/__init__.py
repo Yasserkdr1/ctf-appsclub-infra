@@ -268,6 +268,13 @@ def load(app):  # pylint: disable=too-many-statements
             else:
                 i["manaCost"] = "unknown"
 
+            # Show a VPN VIP instead of an internal NodePort.
+            if challenge and is_teams_mode() and not challenge.shared:
+                from CTFd.plugins.ctfd_chall_manager.utils.appsclub_connection_info import player_vip
+                i["connectionInfo"] = player_vip(
+                    i["challengeId"], source_id, i.get("connectionInfo")
+                )
+
         if mana_enabled:
             # calculate mana only if its enabled
             try:
