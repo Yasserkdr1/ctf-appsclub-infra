@@ -1,0 +1,10 @@
+[Interface]
+Address = 10.77.0.2/32
+PrivateKey = {{ wg_worker_secret.content | b64decode | trim }}
+SaveConfig = false
+
+[Peer]
+PublicKey = {{ wg_server_public.stdout }}
+Endpoint = 10.60.1.10:{{ wg_port }}
+AllowedIPs = 10.77.0.1/32, 10.79.0.0/16
+PersistentKeepalive = 25

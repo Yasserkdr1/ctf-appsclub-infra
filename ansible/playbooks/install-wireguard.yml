@@ -10,6 +10,8 @@
     wg_client_address: "10.77.0.10/32"
     wg_public_endpoint: "158.158.123.197"
     wg_client_name: "team-test"
+    wg_client_allowed_ips: "10.77.0.0/24, 10.78.0.0/16"
+    wg_extra_peers: "{{ lookup('file', playbook_dir ~ '/../../config/wg-extra-peers.json') | from_json }}"
 
   tasks:
     - name: Install WireGuard and firewall utilities
@@ -73,6 +75,49 @@
       changed_when: false
       no_log: true
 
+
+    - name: Install worker WireGuard
+      ansible.builtin.apt:
+        name: wireguard-tools
+        state: present
+        update_cache: true
+      delegate_to: "{{ groups['worker'][0] }}"
+
+    - name: Generate worker private key
+      ansible.builtin.shell: |
+        umask 077
+        wg genkey > /etc/wireguard/appsclub-worker.key
+      args:
+        creates: /etc/wireguard/appsclub-worker.key
+      delegate_to: "{{ groups['worker'][0] }}"
+      no_log: true
+
+    - name: Read worker private key
+      ansible.builtin.slurp:
+        src: /etc/wireguard/appsclub-worker.key
+      register: wg_worker_secret
+      delegate_to: "{{ groups['worker'][0] }}"
+      no_log: true
+
+    - name: Compute worker public key
+      ansible.builtin.command:
+        cmd: wg pubkey
+        stdin: "{{ wg_worker_secret.content | b64decode }}"
+      register: wg_worker_public
+      delegate_to: "{{ groups['worker'][0] }}"
+      no_log: true
+
+    - name: Deploy worker WireGuard configuration
+      ansible.builtin.template:
+        src: ../templates/wg-worker.conf.j2
+        dest: /etc/wireguard/wg0.conf
+        owner: root
+        group: root
+        mode: "0600"
+      delegate_to: "{{ groups['worker'][0] }}"
+      notify: Restart worker WireGuard
+      no_log: true
+
     - name: Deploy WireGuard server configuration
       ansible.builtin.template:
         src: ../templates/wg0.conf.j2
@@ -114,6 +159,13 @@
       delegate_to: localhost
       become: false
 
+    - name: Enable and start worker WireGuard
+      ansible.builtin.systemd_service:
+        name: wg-quick@wg0
+        enabled: true
+        state: started
+      delegate_to: "{{ groups['worker'][0] }}"
+
     - name: Enable and start WireGuard
       ansible.builtin.systemd_service:
         name: wg-quick@wg0
@@ -137,3 +189,9 @@
       ansible.builtin.systemd_service:
         name: wg-quick@wg0
         state: restarted
+
+    - name: Restart worker WireGuard
+      ansible.builtin.systemd_service:
+        name: wg-quick@wg0
+        state: restarted
+      delegate_to: "{{ groups['worker'][0] }}"

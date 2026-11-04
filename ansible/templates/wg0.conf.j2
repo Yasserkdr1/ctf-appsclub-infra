@@ -7,7 +7,6 @@ SaveConfig = false
 # Interdire tout transit VPN vers le réseau Azure
 PostUp = iptables -I FORWARD 1 -i %i -j DROP
 PostDown = iptables -D FORWARD -i %i -j DROP
-
 # Autoriser uniquement le ping vers la gateway VPN
 PostUp = iptables -I INPUT 1 -i %i -j DROP
 PostUp = iptables -I INPUT 1 -i %i -p icmp --icmp-type echo-request -j ACCEPT
@@ -18,3 +17,14 @@ PostDown = iptables -D INPUT -i %i -j DROP
 # Client de test
 PublicKey = {{ wg_client_public.stdout }}
 AllowedIPs = {{ wg_client_address }}
+
+# APPSCLUB WORKER PEER
+[Peer]
+PublicKey = {{ wg_worker_public.stdout }}
+AllowedIPs = 10.77.0.2/32, 10.42.0.0/24
+
+{% for peer in wg_extra_peers | default([]) %}
+[Peer]
+PublicKey = {{ peer.public_key }}
+AllowedIPs = {{ peer.address }}
+{% endfor %}
