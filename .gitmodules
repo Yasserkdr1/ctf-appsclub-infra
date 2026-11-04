@@ -1,0 +1,4 @@
+[submodule "external/chall-manager"]
+	path = external/chall-manager
+	url = git@github.com:Yasserkdr1/chall-manager-appsclub.git
+	branch = appsclub/deployment-hardening
