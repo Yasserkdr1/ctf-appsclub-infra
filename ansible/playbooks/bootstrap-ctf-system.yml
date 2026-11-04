@@ -1,0 +1,42 @@
+---
+- name: Bootstrap static AppsClub Kubernetes resources
+  hosts: worker
+  become: true
+  gather_facts: false
+
+  vars:
+    ctf_system_apply: false
+    ctf_system_manifests:
+      - ctf-system-baseline.yaml
+      - ctf-system-allow-dns.yaml
+      - ctf-system-chall-manager-private.yaml
+
+  tasks:
+    - name: Validate manifests against Kubernetes API without persisting
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - apply
+          - --dry-run=server
+          - -f
+          - "-"
+        stdin: "{{ lookup('file', playbook_dir ~ '/../files/k3s/' ~ item) }}"
+      loop: "{{ ctf_system_manifests }}"
+      changed_when: false
+
+    - name: Apply static resources when explicitly enabled
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - apply
+          - -f
+          - "-"
+        stdin: "{{ lookup('file', playbook_dir ~ '/../files/k3s/' ~ item) }}"
+      loop: "{{ ctf_system_manifests }}"
+      when: ctf_system_apply | bool
+      register: bootstrap_result
+      changed_when: >-
+        'created' in bootstrap_result.stdout or
+        'configured' in bootstrap_result.stdout
