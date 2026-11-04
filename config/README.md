@@ -31,3 +31,19 @@ remaining dependencies must be documented before cleanup.
 
 Never commit WireGuard private keys, client profiles,
 broker tokens, or real credentials.
+
+## Static VIP team roster example
+
+The VIP controller loads `vpn-team-peers.json` during
+deployment to configure static player-to-team mappings.
+
+For a fresh installation, copy the example and adapt it:
+
+    cp config/vpn-team-peers.json.example config/vpn-team-peers.json
+
+The example contains no real WireGuard peer keys.
+
+The self-service VPN broker maintains additional dynamic peers.
+
+Do not overwrite the existing roster on a running deployment,
+as doing so can interrupt player access.
