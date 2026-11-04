@@ -1,0 +1,169 @@
+---
+# Deploy after completing legacy rule audit (see README).
+# This playbook installs but DOES NOT START the timer by default.
+- name: Prepare private gateway-to-worker SSH identity
+  hosts: ctfd
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Ensure controller config directory
+      ansible.builtin.file:
+        path: /etc/appsclub-vip
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Generate dedicated controller SSH key on gateway if missing
+      ansible.builtin.command:
+        cmd: ssh-keygen -q -t ed25519 -N '' -f /etc/appsclub-vip/worker_ed25519
+        creates: /etc/appsclub-vip/worker_ed25519
+      no_log: true
+
+    - name: Read controller public key
+      ansible.builtin.slurp:
+        src: /etc/appsclub-vip/worker_ed25519.pub
+      register: vip_controller_public
+
+- name: Deploy restricted worker helper
+  hosts: worker
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Create restricted controller group
+      ansible.builtin.group:
+        name: appsclub-sync
+        state: present
+
+    - name: Create locked-down SSH account for gateway reconciler
+      ansible.builtin.user:
+        name: appsclub-sync
+        group: appsclub-sync
+        comment: AppsClub VIP controller restricted SSH
+        home: /var/lib/appsclub-vip-worker
+        shell: /bin/sh
+        password_lock: true
+        create_home: true
+        state: present
+
+    - name: Ensure SSH directory for restricted account
+      ansible.builtin.file:
+        path: /var/lib/appsclub-vip-worker/.ssh
+        state: directory
+        owner: appsclub-sync
+        group: appsclub-sync
+        mode: "0700"
+
+    - name: Deploy root-owned restricted Kubernetes wrapper
+      ansible.builtin.copy:
+        src: ../files/appsclub_vip_k8s.py
+        dest: /usr/local/sbin/appsclub-vip-k8s
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy SSH forced-command dispatcher
+      ansible.builtin.copy:
+        src: ../files/appsclub_vip_ssh_dispatch.py
+        dest: /usr/local/bin/appsclub-vip-ssh-dispatch
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Grant only restricted helper via sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/appsclub-vip
+        content: "appsclub-sync ALL=(root) NOPASSWD: /usr/local/sbin/appsclub-vip-k8s\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Install gateway key as restricted SSH key
+      ansible.builtin.copy:
+        dest: /var/lib/appsclub-vip-worker/.ssh/authorized_keys
+        content: |
+          from="10.60.1.10",restrict,command="/usr/local/bin/appsclub-vip-ssh-dispatch" {{ hostvars[groups['ctfd'][0]].vip_controller_public.content | b64decode | trim }}
+        owner: appsclub-sync
+        group: appsclub-sync
+        mode: "0600"
+
+    - name: Read worker SSH host public key for pinning
+      ansible.builtin.slurp:
+        src: /etc/ssh/ssh_host_ed25519_key.pub
+      register: vip_worker_host_public
+
+- name: Install gateway VIP controller and systemd units
+  hosts: ctfd
+  become: true
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../.."
+  tasks:
+    - name: Pin worker SSH host key from Ansible-managed host
+      ansible.builtin.copy:
+        dest: /etc/appsclub-vip/known_hosts
+        content: |
+          10.60.2.10 {{ hostvars[groups['worker'][0]].vip_worker_host_public.content | b64decode | trim }}
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Ensure local controller library directory
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install controller script
+      ansible.builtin.copy:
+        src: ../files/appsclub_vip_controller.py
+        dest: /usr/local/libexec/appsclub-vip-controller.py
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Create persistent state directory
+      ansible.builtin.file:
+        path: /var/lib/appsclub-vip
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Install current team peer registry
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/vpn-team-peers.json"
+        dest: /etc/appsclub-vip/vpn-team-peers.json
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Install systemd service
+      ansible.builtin.template:
+        src: ../templates/appsclub-vip-sync.service.j2
+        dest: /etc/systemd/system/appsclub-vip-sync.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install systemd timer
+      ansible.builtin.template:
+        src: ../templates/appsclub-vip-sync.timer.j2
+        dest: /etc/systemd/system/appsclub-vip-sync.timer
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Reload systemd unit files
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Enable timer only when explicitly requested
+      ansible.builtin.systemd_service:
+        name: appsclub-vip-sync.timer
+        enabled: true
+        state: started
+      when: vip_enable_timer | default(false) | bool

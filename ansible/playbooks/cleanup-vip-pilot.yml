@@ -1,0 +1,63 @@
+---
+# Run ONLY AFTER updating wg0.conf.j2 and re-running install-wireguard.yml.
+- name: Remove leftover one-off gateway VIP pilot firewall hooks
+  hosts: ctfd
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Backup gateway firewall rules before controlled cleanup
+      ansible.builtin.shell: |
+        set -eu
+        umask 077
+        iptables-save > /var/backups/appsclub-before-vip-cleanup.rules
+      changed_when: false
+
+    - name: Install dedicated known-pilot firewall cleaner
+      ansible.builtin.copy:
+        src: ../files/appsclub_vip_cleanup_legacy.py
+        dest: /usr/local/sbin/appsclub-vip-cleanup-legacy
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Remove only recognized legacy VIP rules
+      ansible.builtin.command: /usr/local/sbin/appsclub-vip-cleanup-legacy
+      register: legacy_cleanup
+      changed_when: "legacy_cleanup.stdout != ''"
+
+- name: Remove stale legacy trial policy after asserting its Pod is absent
+  hosts: worker
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Inspect legacy policy
+      ansible.builtin.command: >-
+        k3s kubectl -n cm-target-daunsoix get networkpolicy appsclub-vip-pilot -o json
+      register: old_policy
+      changed_when: false
+      failed_when: false
+
+    - name: Extract legacy policy identity
+      ansible.builtin.set_fact:
+        old_identity: "{{ (old_policy.stdout | from_json).spec.podSelector.matchLabels['chall-manager.ctfer.io/identity'] }}"
+      when: old_policy.rc == 0
+
+    - name: Check old identity has no remaining Pods
+      ansible.builtin.command: >-
+        k3s kubectl -n cm-target-daunsoix get pods
+        -l chall-manager.ctfer.io/identity={{ old_identity }} -o json
+      register: old_pods
+      changed_when: false
+      when: old_policy.rc == 0
+
+    - name: Refuse to remove policy selecting a live Pod
+      ansible.builtin.assert:
+        that:
+          - "((old_pods.stdout | from_json)['items'] | length) == 0"
+      when: old_policy.rc == 0
+
+    - name: Delete obsolete pilot NetworkPolicy
+      ansible.builtin.command: >-
+        k3s kubectl -n cm-target-daunsoix delete networkpolicy appsclub-vip-pilot
+        --ignore-not-found=true
+      changed_when: old_policy.rc == 0
