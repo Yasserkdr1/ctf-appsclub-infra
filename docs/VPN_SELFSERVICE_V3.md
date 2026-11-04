@@ -89,7 +89,7 @@ ssh ctf-gateway 'systemctl is-active appsclub-vpn-reconcile.timer; systemctl is-
 7. Check player-origin access to `10.60.2.10:31080`, worker API `:6443`, arbitrary NodePorts, and other team's VIP is blocked.
 8. Back up the broker SQLite DB **securely** and test restore. Never put private-key config files in Git.
 
-After every user has a working new self-service profile, use the **explicit** `scripts/cutover_remove_demo_peers.py`, inspect its Git diff, deploy `install-wireguard.yml` and `deploy-vip-controller.yml`, then confirm only the worker and `.100+` self-service peers remain. This removes the previously leaked static test key.
+After every user has a working new self-service profile, use the **explicit** `scripts/migrations/cutover_remove_demo_peers.py`, inspect its Git diff, deploy `install-wireguard.yml` and `deploy-vip-controller.yml`, then confirm only the worker and `.100+` self-service peers remain. This removes the previously leaked static test key.
 
 ## Rollback
 

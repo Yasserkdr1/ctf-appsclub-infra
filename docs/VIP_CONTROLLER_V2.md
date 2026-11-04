@@ -49,7 +49,7 @@ The package includes a **guarded cleanup** for this specific pilot. Review the d
 
 ```bash
 cd ~/ctf/ctf-appsclub-infra
-python3 scripts/remove_legacy_wireguard_pilot.py
+python3 scripts/migrations/remove_legacy_wireguard_pilot.py
 git diff -- ansible/templates/wg0.conf.j2 ansible/playbooks/install-wireguard.yml
 cd ansible
 ansible-playbook -i inventory.ini playbooks/install-wireguard.yml
