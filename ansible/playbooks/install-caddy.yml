@@ -1,0 +1,93 @@
+---
+- name: Install and configure AppsClub HTTPS ingress
+  hosts: ctfd
+  become: true
+  vars:
+    ctf_domain: "ctf.158.158.123.197.sslip.io"
+
+  tasks:
+    - name: Verify that CTFd is reachable on loopback
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: 8000
+        timeout: 15
+
+    - name: Install official Caddy repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+        state: present
+        update_cache: true
+
+    - name: Download official Caddy repository signing key
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /usr/local/share/caddy-stable-signing-key.asc
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Convert Caddy signing key for APT
+      ansible.builtin.command:
+        cmd: >-
+          gpg --batch --dearmor
+          --output /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          /usr/local/share/caddy-stable-signing-key.asc
+        creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    - name: Make Caddy APT key readable
+      ansible.builtin.file:
+        path: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Add official Caddy APT repository
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt
+        dest: /etc/apt/sources.list.d/caddy-stable.list
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install Caddy
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+        update_cache: true
+
+    - name: Render validated Caddy configuration
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/Caddyfile.j2"
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: "0644"
+        validate: "/usr/bin/caddy validate --config %s --adapter caddyfile"
+      notify: Reload Caddy
+
+    - name: Start and enable Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: started
+
+    - name: Apply pending configuration change
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify HTTPS ports are listening
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: 443
+        timeout: 30
+
+  handlers:
+    - name: Reload Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        state: reloaded

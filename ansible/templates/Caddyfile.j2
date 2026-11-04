@@ -1,0 +1,5 @@
+# AppsClub CTFd HTTPS ingress. HTTP/2 is enabled automatically on TLS.
+# Keep upstream HTTP/1.1 on loopback; Caddy auto-flushes text/event-stream.
+{{ ctf_domain }} {
+    reverse_proxy 127.0.0.1:8000
+}
