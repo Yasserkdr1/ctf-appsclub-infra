@@ -127,7 +127,7 @@ Candidates, not automatic deletions:
 - `ansible/playbooks/install-ctfd.yml.bak-*`
 - `ansible/playbooks/vip-pilot.yml`
 - `ansible/files/k3s/netcheck.yaml`, `network-probe.yaml`
-- `ansible/files/k3s/ctf-test-*` (verify whether old namespace is still referenced)
+- `ansible/files/k3s/ctf-test-*` (removed after dependency audit)
 - `scripts/patch_vip_controller_for_dynamic_peers.py`, `prepare_ctfd_selfservice.py`, `remove_legacy_wireguard_pilot.py` (one-time migration scripts; preserve in `scripts/migrations/` if still needed)
 - `*:Zone.Identifier`, Python bytecode and local `.tfplan`
 

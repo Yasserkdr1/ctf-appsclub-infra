@@ -38,7 +38,7 @@ The target namespace currently has Pulumi-generated `deny-all-*` and `dns-*` pol
 
 - `chall-manager-rbac.yaml`, `chall-manager-serviceaccount.yaml`: compare to Pulumi-generated ServiceAccount/Role/RoleBinding and `install-k3s.yml`; do not apply over Pulumi-controlled objects.
 - `ctf-system-*.yaml`: inspect whether bootstrapping or Pulumi deploy still uses them.
-- `ctf-test-*.yaml`: names suggest historical namespace/config. The actual challenge target is `cm-target-daunsoix`; review and archive only if unreferenced.
+- `ctf-test-*.yaml`: names suggest historical namespace/config. The actual challenge target is `cm-target-daunsoix`. Legacy ctf-test manifests were removed after verifying no active code references.
 - `netcheck.yaml`, `network-probe.yaml`: likely network diagnostics; move to `examples/diagnostics/` or remove only after inspecting contents and references.
 
 A static reference scan is **not proof** a manifest is unused: manual `kubectl apply`, legacy docs, and remote state may still depend on it. Maintain a small table of *bootstrap / Pulumi-owned / diagnostic / retired*.
