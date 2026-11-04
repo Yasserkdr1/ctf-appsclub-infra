@@ -124,7 +124,7 @@ resource "azurerm_network_security_rule" "worker_deny_vnet_in" {
 # Kubernetes NetworkPolicies and host firewalls are still mandatory.
 resource "azurerm_network_security_rule" "worker_deny_ctfd_out" {
   name                        = "DenyWorkerInitiatedToCTFd"
-  priority                    = 100
+  priority                    = 110
   direction                   = "Outbound"
   access                      = "Deny"
   protocol                    = "*"
@@ -190,4 +190,27 @@ resource "azurerm_subnet_nat_gateway_association" "worker" {
   subnet_id      = azurerm_subnet.worker.id
   nat_gateway_id = azurerm_nat_gateway.worker[0].id
   depends_on     = [azurerm_nat_gateway_public_ip_association.worker]
+}
+
+
+# Worker 10.60.2.10 -> Gateway 10.60.1.10:51820/UDP
+resource "azurerm_network_security_rule" "worker_wireguard_to_gateway" {
+  name      = "AllowWorkerToGatewayWireGuard"
+  priority  = 100
+  direction = "Outbound"
+  access    = "Allow"
+  protocol  = "Udp"
+
+  source_port_range      = "*"
+  destination_port_range = "51820"
+
+  source_address_prefix      = "10.60.2.10/32"
+  destination_address_prefix = "${var.ctfd_private_ip}/32"
+
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = azurerm_network_security_group.worker.name
+
+  depends_on = [
+    azurerm_network_security_rule.worker_deny_ctfd_out
+  ]
 }
