@@ -31,3 +31,10 @@ crash.*.log
 
 # Local Ansible inventory
 /ansible/inventory.ini
+
+# AppsClub local and generated files
+**/__pycache__/
+**/*.py[cod]
+*.bak
+/config/wg-extra-peers.json
+/config/vpn-team-peers.json
