@@ -1,0 +1,20 @@
+[Unit]
+Description=AppsClub VPN memberships and peer synchronization
+After=network-online.target wg-quick@wg0.service
+Wants=network-online.target
+Requires=wg-quick@wg0.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /usr/local/libexec/appsclub-vpn-broker.py reconcile
+TimeoutStartSec=25
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/appsclub-vpn /var/lib/appsclub-vip /run/lock
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelTunables=true

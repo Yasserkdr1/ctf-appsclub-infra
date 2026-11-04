@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify CTFd membership and restore/revoke WireGuard peers every 10 seconds
+
+[Timer]
+OnBootSec=25s
+OnUnitInactiveSec=10s
+AccuracySec=1s
+Unit=appsclub-vpn-reconcile.service
+
+[Install]
+WantedBy=timers.target
