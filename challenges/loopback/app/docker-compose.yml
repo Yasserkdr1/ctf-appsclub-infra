@@ -1,0 +1,15 @@
+services:
+  order-lookup:
+    build: .
+    ports:
+      - "8002:5000"
+    environment:
+      - FLAG=bwctf{local_test_only}
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 128m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

@@ -133,6 +133,22 @@
         group: root
         mode: "0700"
 
+    - name: Create ephemeral public VIP directory for CTFd (read-only bind mount)
+      ansible.builtin.file:
+        path: /run/appsclub-vip-public
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Recreate the public VIP directory on gateway reboot
+      ansible.builtin.copy:
+        dest: /etc/tmpfiles.d/appsclub-vip-public.conf
+        content: "d /run/appsclub-vip-public 0755 root root -\n"
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Install current team peer registry
       ansible.builtin.copy:
         src: "{{ repo_root }}/config/vpn-team-peers.json"

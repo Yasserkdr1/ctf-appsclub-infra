@@ -1,0 +1,3 @@
+name: ctf-hit-ghost-jackpot
+runtime: go
+description: Dynamic Hit Ghost Jackpot web challenge for AppsClub CTF

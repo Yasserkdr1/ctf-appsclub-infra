@@ -1,0 +1,138 @@
+body {
+  font-family: Verdana, Geneva, Arial, sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  margin: 0;
+  font-size: 13px;
+}
+
+#header {
+  background: #003366;
+  color: #ffffff;
+  padding: 14px 18px;
+  border-bottom: 4px solid #ff6600;
+}
+
+#header .company {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+#header .tagline {
+  font-size: 11px;
+  color: #cce0ff;
+  margin-top: 2px;
+}
+
+#nav {
+  background: #eeeeee;
+  border-bottom: 1px solid #cccccc;
+  padding: 6px 18px;
+  font-size: 12px;
+}
+
+#nav a {
+  color: #003366;
+  margin-right: 16px;
+  text-decoration: none;
+}
+
+#nav a:hover {
+  text-decoration: underline;
+}
+
+.content {
+  max-width: 640px;
+  margin: 24px auto;
+  padding: 0 18px;
+}
+
+h1 {
+  font-size: 16px;
+  color: #003366;
+  border-bottom: 1px solid #cccccc;
+  padding-bottom: 6px;
+}
+
+.box {
+  border: 1px solid #cccccc;
+  background: #f7f7f7;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+input[type="text"] {
+  width: 240px;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid #999999;
+}
+
+input[type="submit"], button {
+  background: #003366;
+  color: #ffffff;
+  border: 1px solid #002244;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+input[type="submit"]:hover, button:hover {
+  background: #002244;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+table caption {
+  text-align: left;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+td, th {
+  border: 1px solid #cccccc;
+  padding: 5px 8px;
+  text-align: left;
+}
+
+th {
+  background: #dddddd;
+  width: 120px;
+}
+
+#result-area {
+  margin-top: 12px;
+}
+
+.err {
+  color: #990000;
+  font-weight: bold;
+}
+
+.hint {
+  font-size: 11px;
+  color: #666666;
+  margin-top: 6px;
+}
+
+#footer {
+  border-top: 1px solid #cccccc;
+  margin-top: 30px;
+  padding: 10px 18px;
+  font-size: 11px;
+  color: #777777;
+  text-align: center;
+}

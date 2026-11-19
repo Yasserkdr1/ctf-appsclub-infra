@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loopback - Track your order</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="header">
+  <div class="company">Loopback</div>
+  <div class="tagline">Shipping and order tracking since 1998</div>
+</div>
+
+<div id="nav">
+  <a href="#">Home</a>
+  <a href="#">Services</a>
+  <a href="#">Track order</a>
+  <a href="#">Contact us</a>
+</div>
+
+<div class="content">
+  <h1>Track your order</h1>
+
+  <div class="box">
+    <form id="track-form">
+      <label for="order">Order number</label>
+      <input type="text" id="order" name="order" placeholder="e.g. ORD-1042">
+      <input type="submit" value="Track">
+    </form>
+    <div class="hint">Try one of your recent orders, for example ORD-1042.</div>
+  </div>
+
+  <div id="result-area"></div>
+</div>
+
+
+<script>
+function showError(text) {
+  document.getElementById('result-area').innerHTML = '<p class="err">' + text + '</p>';
+}
+
+function showResult(d) {
+  var rows = [
+    ['Order', d.order],
+    ['Customer', d.customer],
+    ['Status', d.status],
+    ['ETA', d.eta],
+    ['Notes', d.notes]
+  ];
+  var html = '<table><caption>Order details</caption>';
+  rows.forEach(function (r) {
+    html += '<tr><th>' + r[0] + '</th><td>' + r[1] + '</td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('result-area').innerHTML = html;
+}
+
+document.getElementById('track-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var order = document.getElementById('order').value.trim();
+  if (!order) { showError('Please enter an order number.'); return; }
+  fetch('/api/track?order=' + encodeURIComponent(order))
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) { showError(res.d.detail || res.d.error); return; }
+      showResult(res.d);
+    })
+    .catch(function () { showError('Network error.'); });
+});
+</script>
+
+</body>
+</html>

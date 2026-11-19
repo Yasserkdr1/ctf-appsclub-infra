@@ -47,6 +47,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /run/appsclub-vpn:/run/appsclub-vpn:rw
+      - /run/appsclub-vip-public:/run/appsclub-vip-public:ro
       - /etc/appsclub-vpn/broker.token:/run/secrets/appsclub-vpn-token:ro
       - ctfd_uploads:/var/uploads
       - ctfd_logs:/var/log/CTFd

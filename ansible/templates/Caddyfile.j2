@@ -3,3 +3,12 @@
 {{ ctf_domain }} {
     reverse_proxy 127.0.0.1:8000
 }
+
+# Cloudflare Tunnel -> Caddy -> CTFd
+http://:8081 {
+    bind 127.0.0.1
+
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Forwarded-Proto https
+    }
+}

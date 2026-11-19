@@ -51,8 +51,14 @@ def validate_policy(obj):
     if not isinstance(ingress, list) or len(ingress) != 1:
         raise ValueError("Expected exactly one ingress rule")
     rule = ingress[0]
-    if set(rule) != {"from", "ports"} or rule["ports"] != [{"protocol": "TCP"}]:
-        raise ValueError("Expected TCP-only ingress")
+    if set(rule) != {"from", "ports"}:
+        raise ValueError("Expected one TCP port ingress")
+    ports = rule["ports"]
+    if (not isinstance(ports, list) or len(ports) != 1 or
+            not isinstance(ports[0], dict) or set(ports[0]) != {"protocol", "port"} or
+            ports[0]["protocol"] != "TCP" or type(ports[0]["port"]) is not int or
+            not 1 <= ports[0]["port"] <= 65535):
+        raise ValueError("Expected one numeric TCP port ingress")
     sources = rule["from"]
     if not isinstance(sources, list) or len(sources) != 1:
         raise ValueError("Expected one source identity")

@@ -1,0 +1,6 @@
+name: ctf-loopback
+runtime:
+  name: go
+  options:
+    binary: ./ctf-loopback
+description: Dynamic Loopback web challenge for AppsClub CTF

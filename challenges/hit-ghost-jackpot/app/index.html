@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghost Industries - Catalog</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; background: #e8e8e8; margin: 0; }
+  header { background: #2e2e2e; color: #fff; padding: 8px 16px; font-size: 14px; }
+  header a { color: #bbb; float: right; font-size: 12px; }
+  main { max-width: 860px; margin: 24px auto; background: #fff; border: 1px solid #bbb; padding: 18px 20px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  select, input, button { padding: 5px 6px; font-size: 13px; border: 1px solid #aaa; }
+  input { width: 220px; }
+  #msg { color: #b00; font-size: 12px; margin: 10px 0 0; min-height: 14px; }
+  #count { color: #555; font-size: 12px; margin: 10px 0 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  th, td { border: 1px solid #ddd; padding: 5px 8px; text-align: left; }
+  th { background: #f4f4f4; }
+  footer { text-align: center; color: #999; font-size: 11px; padding: 16px; }
+</style>
+</head>
+<body>
+<header>Ghost Industries - inventory <a href="#" id="logout">sign out</a></header>
+<main>
+  <h2>Product catalog</h2>
+  <form id="f">
+    <select id="category"><option value="">All categories</option></select>
+    <input id="q" placeholder="search by name">
+    <button type="submit">Search</button>
+  </form>
+  <div id="msg"></div>
+  <div id="count"></div>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Description</th><th>Price</th><th>Category</th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+</main>
+<footer>internal use only</footer>
+<script>
+var H = { 'X-Internal-User': 'admin' };
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function fill(rows) {
+  var tb = document.getElementById('tb');
+  tb.innerHTML = '';
+  rows.forEach(function (r) {
+    var tr = document.createElement('tr');
+    [r.id, r.name, r.description, r.price, r.category].forEach(function (v) {
+      var td = document.createElement('td');
+      td.innerHTML = esc(v);
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+}
+
+function loadCats() {
+  fetch('/api/categories', { headers: H }).then(function (r) { return r.json(); }).then(function (d) {
+    var sel = document.getElementById('category');
+    (d.categories || []).forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  });
+}
+
+function loadAll() {
+  fetch('/api/products', { headers: H }).then(function (r) { return r.json(); }).then(function (d) {
+    document.getElementById('count').textContent = d.count + ' item(s)';
+    fill(d.results || []);
+  });
+}
+
+document.getElementById('f').onsubmit = function (e) {
+  e.preventDefault();
+  document.getElementById('msg').textContent = '';
+  var params = new URLSearchParams();
+  var q = document.getElementById('q').value;
+  var c = document.getElementById('category').value;
+  if (q) params.set('q', q);
+  if (c) params.set('category', c);
+  fetch('/api/search?' + params.toString(), { headers: H }).then(function (r) {
+    return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+  }).then(function (res) {
+    if (!res.ok) {
+      document.getElementById('msg').textContent = res.status + ' ' + (res.d.detail || res.d.error);
+      document.getElementById('count').textContent = '';
+      return;
+    }
+    document.getElementById('count').textContent = res.d.count + ' result(s)';
+    fill(res.d.results || []);
+  });
+};
+
+document.getElementById('logout').onclick = function (e) {
+  e.preventDefault();
+  fetch('/api/logout', { method: 'POST' }).then(function () { location.reload(); });
+};
+
+loadCats();
+loadAll();
+</script>
+</body>
+</html>

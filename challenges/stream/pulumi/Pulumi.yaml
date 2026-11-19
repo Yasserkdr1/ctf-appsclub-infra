@@ -1,0 +1,6 @@
+name: ctf-stream
+runtime:
+  name: go
+  options:
+    binary: ./ctf-stream
+description: Dynamic Stream PHP/SQLite Web challenge for AppsClub CTF

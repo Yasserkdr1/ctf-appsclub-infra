@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loopback - Dispatch board</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="header">
+  <div class="company">Loopback LOGISTICS</div>
+  <div class="tagline">Internal dispatch board</div>
+</div>
+
+<div id="nav">
+  <a href="/">Home</a>
+  <a href="#">Dispatch</a>
+</div>
+
+<div class="content">
+  <h1>Dispatch board</h1>
+  <div class="box">
+    <p>Staff dispatch status. For warehouse use only.</p>
+    <button id="check">Check status</button>
+  </div>
+  <div id="result-area"></div>
+</div>
+
+<script>
+function showError(text) {
+  document.getElementById('result-area').innerHTML = '<p class="err">' + text + '</p>';
+}
+
+document.getElementById('check').addEventListener('click', function () {
+  showError('Checking...');
+  fetch('/api/whoami')
+    .then(function (r) { return r.json(); })
+    .then(function (who) {
+      return fetch('/api/dispatch', {
+        headers: {
+          'X-Is-staff': 'false',
+          'X-Source-IP': who.ip
+        }
+      });
+    })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) { showError(res.d.detail || res.d.error); return; }
+      document.getElementById('result-area').innerHTML =
+        '<table><caption>Dispatch status</caption>' +
+        '<tr><th>Board</th><td>' + res.d.board + '</td></tr>' +
+        '<tr><th>Status</th><td>' + res.d.status + '</td></tr>' +
+        '<tr><th>Notes</th><td>' + res.d.notes + '</td></tr>' +
+        '</table>';
+    })
+    .catch(function () { showError('Network error.'); });
+});
+</script>
+
+</body>
+</html>

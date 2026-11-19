@@ -38,3 +38,7 @@ crash.*.log
 *.bak
 /config/wg-extra-peers.json
 /config/vpn-team-peers.json
+
+# Pulumi compiled Go binaries
+/challenges/loopback/pulumi/ctf-loopback
+/challenges/stream/pulumi/ctf-stream

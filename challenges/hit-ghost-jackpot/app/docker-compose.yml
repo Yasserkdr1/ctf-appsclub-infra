@@ -1,0 +1,19 @@
+services:
+  ghost-jackpot:
+    build: .
+    ports:
+      - "127.0.0.1:18001:5000"
+    environment:
+      FLAG: "${FLAG:?Provide a local test flag in the FLAG environment variable}"
+      SECRET_KEY: "${SECRET_KEY:?Provide a local Flask session key in the SECRET_KEY environment variable}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16m
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

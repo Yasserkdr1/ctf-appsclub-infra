@@ -12,6 +12,7 @@ import fcntl
 import ipaddress
 import json
 import logging
+import time
 import re
 import subprocess
 import sys
@@ -27,6 +28,8 @@ WORKER = "appsclub-sync@10.60.2.10"
 SSH_KEY = "/etc/appsclub-vip/worker_ed25519"
 KNOWN_HOSTS = "/etc/appsclub-vip/known_hosts"
 STATE_DIR = Path("/var/lib/appsclub-vip")
+PUBLIC_DIR = Path("/run/appsclub-vip-public")
+PUBLIC_MAP = PUBLIC_DIR / "active-vips.json"
 CHAINS = ("ACVIP_FWD", "ACVIP_DNAT", "ACVIP_SNAT")
 
 
@@ -133,12 +136,20 @@ def desired(teams: dict, items: list[dict]) -> list[dict]:
                 LOG.warning("Skipping %s/%s: no private NodePort", sid, cid)
                 continue
             port = int(match.group(1))
-            matching = [s for s in svcs if any(p.get("nodePort") == port
-                         for p in s.get("spec", {}).get("ports", []))]
+            matching = [(s, p) for s in svcs
+                        for p in s.get("spec", {}).get("ports", [])
+                        if p.get("nodePort") == port]
             if len(matching) != 1:
                 LOG.warning("Skipping %s/%s: missing/ambiguous service", sid, cid)
                 continue
-            svc = matching[0]
+            svc, svc_port = matching[0]
+            app_port = svc_port.get("targetPort", svc_port.get("port"))
+            if type(app_port) is not int or not 1 <= app_port <= 65535:
+                LOG.warning("Skipping %s/%s: invalid/named TCP targetPort", sid, cid)
+                continue
+            if svc_port.get("protocol", "TCP") != "TCP":
+                LOG.warning("Skipping %s/%s: non-TCP challenge", sid, cid)
+                continue
             identity = svc.get("metadata", {}).get("labels", {}).get(POD_LABEL, "")
             if not IDENT.fullmatch(identity) or identity not in protected:
                 LOG.warning("Skipping %s/%s: missing identity or SDK NetworkPolicy", sid, cid)
@@ -157,7 +168,8 @@ def desired(teams: dict, items: list[dict]) -> list[dict]:
                 raise ValueError("Unexpected Pod IP")
             result.append({"team": sid, "challenge": cid, "identity": identity,
                            "vip": f"10.78.{sid}.{cid}", "source_ip": f"10.79.{sid}.1",
-                           "pod_ip": pod_ip, "peers": peers})
+                           "pod_ip": pod_ip, "peers": peers,
+                           "node_port": port, "app_port": app_port})
     if len({x["vip"] for x in result}) != len(result):
         raise ValueError("VIP collision")
     if len({x["pod_ip"] for x in result}) != len(result):
@@ -172,7 +184,7 @@ def policy(x: dict) -> dict:
             "spec": {"podSelector": {"matchLabels": {POD_LABEL: x["identity"]}},
                      "policyTypes": ["Ingress"],
                      "ingress": [{"from": [{"ipBlock": {"cidr": x["source_ip"] + "/32"}}],
-                                  "ports": [{"protocol": "TCP"}]}]}}
+                                  "ports": [{"protocol": "TCP", "port": x["app_port"]}]}]}}
 
 
 def ipt(*args: str, table: str = "filter") -> str:
@@ -228,14 +240,17 @@ def build_rules(plan: list[dict]) -> list[tuple[str, str, list[str]]]:
         for peer in x["peers"]:
             rules.extend([
                 ("filter", "ACVIP_FWD", ["-i", "wg0", "-o", "wg0", "-s", peer,
-                                         "-d", x["pod_ip"] + "/32", "-p", "tcp", "-j", "ACCEPT"]),
+                                         "-d", x["pod_ip"] + "/32", "-p", "tcp",
+                                         "--dport", str(x["app_port"]), "-j", "ACCEPT"]),
                 ("filter", "ACVIP_FWD", ["-i", "wg0", "-o", "wg0", "-s", x["pod_ip"] + "/32",
-                                         "-d", peer, "-p", "tcp", "-m", "conntrack",
-                                         "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"]),
+                                         "-d", peer, "-p", "tcp", "--sport", str(x["app_port"]),
+                                         "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"]),
                 ("nat", "ACVIP_DNAT", ["-s", peer, "-d", x["vip"] + "/32",
-                                          "-p", "tcp", "-j", "DNAT", "--to-destination", x["pod_ip"]]),
+                                          "-p", "tcp", "--dport", str(x["app_port"]),
+                                          "-j", "DNAT", "--to-destination", x["pod_ip"]]),
                 ("nat", "ACVIP_SNAT", ["-s", peer, "-d", x["pod_ip"] + "/32",
-                                          "-p", "tcp", "-j", "SNAT", "--to-source", x["source_ip"]]),
+                                          "-p", "tcp", "--dport", str(x["app_port"]),
+                                          "-j", "SNAT", "--to-source", x["source_ip"]]),
             ])
     return rules
 
@@ -286,6 +301,25 @@ def verify_gateway_peers(plan: list[dict]) -> None:
                 raise RuntimeError(f"VPN peer not installed on gateway: {peer}")
 
 
+def publish_routes(plan: list[dict]) -> None:
+    # Publish *only* player-facing data, never Pod IPs, peer IPs or identities.
+    # /run is ephemeral across VM reboots; the file is bind-mounted read-only in CTFd.
+    payload = {"version": 1, "updated_at": int(time.time()),
+               "routes": {f'{x["team"]}/{x["challenge"]}':
+                          {"node_port": x["node_port"], "app_port": x["app_port"]}
+                          for x in plan}}
+    PUBLIC_DIR.mkdir(parents=True, mode=0o755, exist_ok=True)
+    PUBLIC_DIR.chmod(0o755)
+    temp = PUBLIC_DIR / "active-vips.json.tmp"
+    temp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
+    temp.chmod(0o644)
+    temp.replace(PUBLIC_MAP)
+
+
+def withdraw_routes() -> None:
+    PUBLIC_MAP.unlink(missing_ok=True)
+
+
 def reconcile(plan: list[dict], resources: list[dict]) -> None:
     verify_gateway_peers(plan)
     legacy_check()
@@ -301,6 +335,8 @@ def reconcile(plan: list[dict], resources: list[dict]) -> None:
                 for p in owned)
     )
     if same_plan and same_policies and fw_matches(plan):
+        # Refresh heartbeat: stale controller state must never be shown in CTFd.
+        publish_routes(plan)
         LOG.info("No changes: %s active instance(s)", len(plan))
         return
     # Install policies BEFORE opening firewall. Failed apply -> fail-closed on gateway.
@@ -319,6 +355,8 @@ def reconcile(plan: list[dict], resources: list[dict]) -> None:
     temp.write_text(json.dumps(plan, indent=2) + "\n")
     temp.chmod(0o600)
     temp.replace(current_state)
+    # Only advertise VIPs once firewall and worker NetworkPolicies are installed.
+    publish_routes(plan)
     LOG.info("Applied %s instance(s) with scoped forward/return rules", len(plan))
 
 
@@ -348,6 +386,7 @@ if __name__ == "__main__":
         # Never leave old VIP access in place when current ownership is unknown.
         # Requires root; harmless during an unprivileged dry run.
         if "--apply" in sys.argv:
+            withdraw_routes()
             clear_owned()
             LOG.error("Cleared controller-owned firewall chains (fail closed)")
         sys.exit(1)

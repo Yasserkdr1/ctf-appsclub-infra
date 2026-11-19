@@ -1,0 +1,119 @@
+package main
+
+import (
+	"strings"
+
+	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
+	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+)
+
+// Harden the Deployment created by Chall-Manager's ExposedMonopod.
+func hardenDeployment(a *pulumi.ResourceTransformationArgs) *pulumi.ResourceTransformationResult {
+	if a.Type != "kubernetes:apps/v1:Deployment" ||
+		!strings.HasPrefix(a.Name, "emp-dep-") {
+		return nil
+	}
+
+	dep, ok := a.Props.(*appsv1.DeploymentArgs)
+	if !ok {
+		panic("unexpected Deployment arguments")
+	}
+	spec, ok := dep.Spec.(appsv1.DeploymentSpecArgs)
+	if !ok {
+		panic("unexpected Deployment spec")
+	}
+	template, ok := spec.Template.(*corev1.PodTemplateSpecArgs)
+	if !ok {
+		panic("unexpected Pod template")
+	}
+	pod, ok := template.Spec.(*corev1.PodSpecArgs)
+	if !ok {
+		panic("unexpected Pod spec")
+	}
+	containers, ok := pod.Containers.(corev1.ContainerArray)
+	if !ok || len(containers) != 1 {
+		panic("expected one challenge container")
+	}
+	container, ok := containers[0].(corev1.ContainerArgs)
+	if !ok {
+		panic("unexpected container arguments")
+	}
+
+	pod.AutomountServiceAccountToken = pulumi.BoolPtr(false)
+	pod.SecurityContext = &corev1.PodSecurityContextArgs{
+		RunAsNonRoot: pulumi.BoolPtr(true),
+		RunAsUser:    pulumi.IntPtr(10001),
+		RunAsGroup:   pulumi.IntPtr(10001),
+		// Ensure that the writable emptyDir for SQLite is accessible to uid 10001.
+		FsGroup: pulumi.IntPtr(10001),
+		SeccompProfile: &corev1.SeccompProfileArgs{
+			Type: pulumi.String("RuntimeDefault"),
+		},
+	}
+
+	container.SecurityContext = &corev1.SecurityContextArgs{
+		AllowPrivilegeEscalation: pulumi.BoolPtr(false),
+		ReadOnlyRootFilesystem:   pulumi.BoolPtr(true),
+		Capabilities: &corev1.CapabilitiesArgs{
+			Drop: pulumi.StringArray{pulumi.String("ALL")},
+		},
+	}
+
+	// Gunicorn is launched only after init_db.py has finished creating SQLite.
+	// The K8s Service should not send traffic until HTTP /health responds.
+	container.StartupProbe = &corev1.ProbeArgs{
+		HttpGet: &corev1.HTTPGetActionArgs{
+			Path: pulumi.String("/health"),
+			Port: pulumi.Any(5000),
+		},
+		PeriodSeconds:    pulumi.Int(2),
+		TimeoutSeconds:   pulumi.Int(1),
+		FailureThreshold: pulumi.Int(15),
+	}
+	container.ReadinessProbe = &corev1.ProbeArgs{
+		HttpGet: &corev1.HTTPGetActionArgs{
+			Path: pulumi.String("/health"),
+			Port: pulumi.Any(5000),
+		},
+		PeriodSeconds:    pulumi.Int(3),
+		TimeoutSeconds:   pulumi.Int(1),
+		FailureThreshold: pulumi.Int(2),
+	}
+
+	container.VolumeMounts = corev1.VolumeMountArray{
+		&corev1.VolumeMountArgs{
+			Name:      pulumi.String("tmp"),
+			MountPath: pulumi.String("/tmp"),
+		},
+		&corev1.VolumeMountArgs{
+			Name:      pulumi.String("run"),
+			MountPath: pulumi.String("/run"),
+		},
+	}
+	pod.Volumes = corev1.VolumeArray{
+		&corev1.VolumeArgs{
+			Name: pulumi.String("tmp"),
+			EmptyDir: &corev1.EmptyDirVolumeSourceArgs{
+				SizeLimit: pulumi.StringPtr("32Mi"),
+			},
+		},
+		&corev1.VolumeArgs{
+			Name: pulumi.String("run"),
+			EmptyDir: &corev1.EmptyDirVolumeSourceArgs{
+				SizeLimit: pulumi.StringPtr("8Mi"),
+			},
+		},
+	}
+
+	containers[0] = container
+	pod.Containers = containers
+	template.Spec = pod
+	spec.Template = template
+	dep.Spec = spec
+
+	return &pulumi.ResourceTransformationResult{
+		Props: dep,
+		Opts:  a.Opts,
+	}
+}

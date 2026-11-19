@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /secret.txt
+Disallow: /admin
+Disallow: /backup
+Disallow: /old-portal

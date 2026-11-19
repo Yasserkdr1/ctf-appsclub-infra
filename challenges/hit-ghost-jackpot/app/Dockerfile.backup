@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && useradd --uid 10001 --create-home ctf
+COPY --chown=10001:10001 app.py init_db.py index.html login.html secret.txt robots.txt entrypoint.sh ./
+RUN chmod 0755 /app/entrypoint.sh
+USER 10001:10001
+EXPOSE 5000
+ENTRYPOINT ["/app/entrypoint.sh"]
